@@ -15,7 +15,8 @@ from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianR
 from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 from time import time as get_time
-def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None, stage="fine", cam_type=None):
+def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
+           scaling_modifier = 1.0, override_color = None, stage="fine", cam_type=None):
     """
     Render the scene. 
     
@@ -57,11 +58,9 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
-    # means3D = pc.get_xyz
     # add deformation to each points
     # deformation = pc.get_deformation
 
-    
     means2D = screenspace_points
     opacity = pc._opacity
     shs = pc.get_features
@@ -77,28 +76,34 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         scales = pc._scaling
         rotations = pc._rotation
     deformation_point = pc._deformation_table
+
     if stage == "coarse" :
+        # NOTE: no deformation in the coarse stage
         means3D_final, scales_final, rotations_final, opacity_final, shs_final = means3D, scales, rotations, opacity, shs
     else:
         # time0 = get_time()
         # means3D_deform, scales_deform, rotations_deform, opacity_deform = pc._deformation(means3D[deformation_point], scales[deformation_point], 
-        #                                                                  rotations[deformation_point], opacity[deformation_point],
-        #                                                                  time[deformation_point])
-        means3D_final, scales_final, rotations_final, opacity_final, shs_final = pc._deformation(means3D, scales, 
-                                                                 rotations, opacity, shs,
-                                                                 time)
+        #                                                                                   rotations[deformation_point], opacity[deformation_point],
+        #                                                                                   time[deformation_point])
+        deform_out = pc._deformation(means3D, scales, rotations, opacity, shs, time)
+        means3D_final, scales_final, rotations_final, opacity_final, shs_final = deform_out
         # time1 = get_time()
     # print("deformation forward:",time1-time0)
     # print(time.max())
-
-
+        
+    # Parameters shapes:
+    # means3D_final: (N, 3)
+    # scales_final: (N, 3)
+    # rotations_final: (N, 4)
+    # opacity_final: (N, 1)
+    # shs_final: (N, (pc.max_sh_degree+1)**2, 3)
 
     # time2 = get_time()
     # print("asset value:",time2-time1)
     scales_final = pc.scaling_activation(scales_final)
     rotations_final = pc.rotation_activation(rotations_final)
     opacity = pc.opacity_activation(opacity_final)
-    # print(opacity.max())
+
     # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
     # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
     # shs = None
@@ -136,5 +141,6 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
             "viewspace_points": screenspace_points,
             "visibility_filter" : radii > 0,
             "radii": radii,
-            "depth":depth}
+            "depth":depth,
+            "means3D": means3D_final}
 

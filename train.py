@@ -302,9 +302,13 @@ def training(dataset, hyper, opt, pipe, testing_iterations, saving_iterations, c
     timer = Timer()
     scene = Scene(dataset, gaussians, load_coarse=None)
     timer.start()
+
+    # Coarse stage, no scene deformation
     scene_reconstruction(dataset, opt, hyper, pipe, testing_iterations, saving_iterations,
-                             checkpoint_iterations, checkpoint, debug_from,
-                             gaussians, scene, "coarse", tb_writer, opt.coarse_iterations,timer)
+                         checkpoint_iterations, checkpoint, debug_from,
+                         gaussians, scene, "coarse", tb_writer, opt.coarse_iterations,timer)
+
+    # Fine stage, with scene deformation
     scene_reconstruction(dataset, opt, hyper, pipe, testing_iterations, saving_iterations,
                          checkpoint_iterations, checkpoint, debug_from,
                          gaussians, scene, "fine", tb_writer, opt.iterations,timer)
@@ -335,7 +339,7 @@ def prepare_output_and_logger(expname):
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, stage, dataset_type):
     if tb_writer:
         tb_writer.add_scalar(f'{stage}/train_loss_patches/l1_loss', Ll1.item(), iteration)
-        tb_writer.add_scalar(f'{stage}/train_loss_patchestotal_loss', loss.item(), iteration)
+        tb_writer.add_scalar(f'{stage}/train_loss_patches/total_loss', loss.item(), iteration)
         tb_writer.add_scalar(f'{stage}/iter_time', elapsed, iteration)
         
     
@@ -395,10 +399,12 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     parser = ArgumentParser(description="Training script parameters")
     setup_seed(6666)
+
     lp = ModelParams(parser)
     op = OptimizationParams(parser)
     pp = PipelineParams(parser)
     hp = ModelHiddenParams(parser)
+
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
@@ -426,7 +432,8 @@ if __name__ == "__main__":
     # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
-    training(lp.extract(args), hp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, args.expname)
+    training(lp.extract(args), hp.extract(args), op.extract(args), pp.extract(args), 
+             args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, args.expname)
 
     # All done
     print("\nTraining complete.")
