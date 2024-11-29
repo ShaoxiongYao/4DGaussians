@@ -23,7 +23,6 @@ from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args, ModelHiddenParams
 from gaussian_renderer import GaussianModel
 from time import time
-# import torch.multiprocessing as mp
 import threading
 import concurrent.futures
 
@@ -57,19 +56,12 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
     gt_list = []
     render_list = []
-
     print("point nums:",gaussians._xyz.shape[0])
     for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
         if idx == 0:time1 = time()
-        # breakpoint()
         
-        render_out = render(view, gaussians, pipeline, background, cam_type=cam_type)
-        
-        rendering = render_out["render"]
-
-        # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+        rendering = render(view, gaussians, pipeline, background,cam_type=cam_type)["render"]
         render_images.append(to8b(rendering).transpose(1,2,0))
-        # print(to8b(rendering).shape)
         render_list.append(rendering)
 
         if name in ["train", "test"]:
@@ -77,7 +69,6 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
                 gt = view.original_image[0:3, :, :]
             else:
                 gt  = view['image'].cuda()
-            # torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
             gt_list.append(gt)
 
         # if idx >= 10:
@@ -85,7 +76,6 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
     time2=time()
     print("FPS:",(len(views)-1)/(time2-time1))
-    # print("writing training images.")
 
     multithread_write(gt_list, gts_path)
 
